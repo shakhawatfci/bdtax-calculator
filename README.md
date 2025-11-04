@@ -2,7 +2,7 @@
 
 A simple, responsive, and accurate **income tax calculator** for salaried individuals in Bangladesh, based on the tax rules for **Assessment Years 2025-26** and **2026-27**.
 
-Live Demo: https://yourusername.github.io/tax-calculator
+Live Demo: https://shakhawatfci.github.io/bdtax-calculator/
 
 ---
 
