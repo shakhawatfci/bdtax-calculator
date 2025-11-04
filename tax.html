@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Bangladesh Tax Calculator (2025-27)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- html2canvas & jsPDF -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <style>
+        body {
+            background: #f8f9fa;
+        }
+
+        .card {
+            box-shadow: 0 4px 12px rgba(0, 0, 0, .1);
+        }
+
+        .form-label {
+            font-weight: 600;
+        }
+
+        .result-card {
+            background: #e9f7ef;
+            border-left: 5px solid #28a745;
+            position: relative;
+        }
+
+        .invalid-feedback {
+            display: none;
+        }
+
+        .was-validated .invalid-feedback {
+            display: block;
+        }
+
+        .download-btns {
+            margin-top: 15px;
+        }
+
+        .download-btns .btn {
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body class="py-4">
+    <div class="container">
+
+        <h1 class="text-center mb-4">Bangladesh Income-Tax Calculator <small class="text-muted">(AY 2025-26 &
+                2026-27)</small></h1>
+
+        <div class="card p-4 mb-4">
+            <form id="taxForm" class="row g-3 needs-validation" novalidate>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="assessmentYear">Assessment Year</label>
+                    <select class="form-select" id="assessmentYear" required>
+                        <option value="2025-26">2025-26</option>
+                        <option value="2026-27" selected>2026-27</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="name">Employee Name</label>
+                    <input type="text" class="form-control" id="name" placeholder="e.g. Mr. X">
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="employeeType">Employee Type</label>
+                    <select class="form-select" id="employeeType" required>
+                        <option value="Contractual">Contractual</option>
+                        <option value="Permanent" selected>Permanent</option>
+                    </select>
+                </div>
+
+                <div class="col-md-6">
+                    <label class="form-label" for="status">Status</label>
+                    <select class="form-select" id="status" required>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Age65">Age 65+</option>
+                        <option value="Disable">Disable</option>
+                        <option value="FreedomFighter">Freedom Fighter</option>
+                    </select>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label" for="monthlySalary">Monthly Gross Salary (Tk.)</label>
+                    <input type="number" class="form-control" id="monthlySalary" min="0" step="any" required>
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label" for="festivalBonus">Yearly Festival Bonus (Tk.)</label>
+                    <input type="number" class="form-control" id="festivalBonus" min="0" step="any" value="0">
+                </div>
+
+                <div class="col-md-4">
+                    <label class="form-label" for="otherIncome">Other Yearly Income (Tk.)</label>
+                    <input type="number" class="form-control" id="otherIncome" min="0" step="any" value="0">
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label" for="investment">Investment for Rebate (Tk.)</label>
+                    <input type="number" class="form-control" id="investment" min="0" step="any" value="0">
+                    <div class="invalid-feedback" id="invMsg"></div>
+                </div>
+
+                <div class="col-12 text-end">
+                    <button type="button" class="btn btn-primary btn-lg" onclick="calculateTax()">Calculate Tax</button>
+                </div>
+            </form>
+        </div>
+
+        <div id="result" class="card result-card p-4 d-none">
+            <h4 class="mb-3">Tax Calculation Result</h4>
+            <div id="output" class="row"></div>
+            <div class="download-btns text-end">
+                <button class="btn btn-success btn-sm" onclick="downloadAsPNG()">Download as PNG</button>
+                <button class="btn btn-danger btn-sm" onclick="downloadAsPDF()">Download as PDF</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const fmt = (n) => n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+
+        function calculateTax() {
+            const form = document.getElementById('taxForm');
+            if (!form.checkValidity()) {
+                form.classList.add('was-validated');
+                return;
+            }
+
+            const year = document.getElementById('assessmentYear').value;
+            const name = document.getElementById('name').value.trim() || 'Employee';
+            const empType = document.getElementById('employeeType').value;
+            const status = document.getElementById('status').value;
+            const monSal = parseFloat(document.getElementById('monthlySalary').value) || 0;
+            const bonus = parseFloat(document.getElementById('festivalBonus').value) || 0;
+            const other = parseFloat(document.getElementById('otherIncome').value) || 0;
+            let invest = parseFloat(document.getElementById('investment').value) || 0;
+
+            const yearlySalary = monSal * 12;
+            const totalGross = yearlySalary + bonus + other;
+
+            const maxExempt = (year === '2025-26') ? 450000 : 500000;
+            const exemptSalary = Math.min(yearlySalary / 3, maxExempt);
+            const assessable = totalGross - exemptSalary;
+
+            let nonTaxLimit;
+            if (year === '2025-26') {
+                if (status === 'Male') nonTaxLimit = 350000;
+                else if (status === 'Female' || status === 'Age65') nonTaxLimit = 400000;
+                else if (status === 'Disable') nonTaxLimit = 475000;
+                else if (status === 'FreedomFighter') nonTaxLimit = 500000;
+            } else {
+                if (status === 'Male') nonTaxLimit = 375000;
+                else if (status === 'Female' || status === 'Age65') nonTaxLimit = 425000;
+                else if (status === 'Disable') nonTaxLimit = 500000;
+                else if (status === 'FreedomFighter') nonTaxLimit = 525000;
+            }
+
+            const taxable = Math.max(assessable - nonTaxLimit, 0);
+
+            const slabs = (year === '2025-26')
+                ? [{ amt: 100000, rate: 0.05 }, { amt: 400000, rate: 0.10 },
+                { amt: 500000, rate: 0.15 }, { amt: 500000, rate: 0.20 },
+                { amt: Infinity, rate: 0.25 }]
+                : [{ amt: 300000, rate: 0.10 }, { amt: 400000, rate: 0.15 },
+                { amt: 500000, rate: 0.20 }, { amt: 2000000, rate: 0.25 },
+                { amt: Infinity, rate: 0.30 }];
+
+            let tax = 0, rem = taxable;
+            for (const s of slabs) {
+                if (rem <= 0) break;
+                const inSlab = Math.min(rem, s.amt);
+                tax += inSlab * s.rate;
+                rem -= inSlab;
+            }
+
+            const reb1 = assessable * 0.03;
+            const reb3 = 1000000;
+            const maxAllowedInv = Math.min(reb1 / 0.15, reb3);
+
+            const invInput = document.getElementById('investment');
+            const invMsg = document.getElementById('invMsg');
+
+            if (invest > maxAllowedInv) {
+                invest = maxAllowedInv;
+                invInput.value = invest;
+                invInput.classList.add('is-invalid');
+                invMsg.textContent = `Investment capped at maximum allowable: ${fmt(maxAllowedInv)} Tk.`;
+            } else {
+                invInput.classList.remove('is-invalid');
+                invMsg.textContent = '';
+            }
+
+            const rebate = Math.min(reb1, invest * 0.15, reb3);
+            let netTax = tax - rebate;
+            if (netTax <= 5000) netTax = 5000;
+            const monthly = netTax / 12;
+
+            const out = `
+            <div class="col-12"><strong>Name:</strong> ${name}</div>
+            <div class="col-12"><strong>Assessment Year:</strong> ${year}</div>
+            <div class="col-12"><strong>Employee Type:</strong> ${empType}</div>
+            <div class="col-12"><strong>Status:</strong> ${status}</div>
+            <hr class="my-2">
+            <div class="col-sm-6"><strong>Yearly Salary:</strong> ${fmt(yearlySalary)} Tk.</div>
+            <div class="col-sm-6"><strong>Festival Bonus:</strong> ${fmt(bonus)} Tk.</div>
+            <div class="col-sm-6"><strong>Other Income:</strong> ${fmt(other)} Tk.</div>
+            <div class="col-sm-6"><strong>Total Gross:</strong> ${fmt(totalGross)} Tk.</div>
+            <hr class="my-2">
+            <div class="col-sm-6"><strong>Exempted (Salary):</strong> ${fmt(exemptSalary)} Tk.</div>
+            <div class="col-sm-6"><strong>Assessable Income:</strong> ${fmt(assessable)} Tk.</div>
+            <div class="col-sm-6"><strong>Non-Taxable Limit:</strong> ${fmt(nonTaxLimit)} Tk.</div>
+            <div class="col-sm-6"><strong>Taxable Income:</strong> ${fmt(taxable)} Tk.</div>
+            <hr class="my-2">
+            <div class="col-sm-6"><strong>Gross Tax Liability:</strong> ${fmt(tax)} Tk.</div>
+            <div class="col-sm-6"><strong>Investment Rebate:</strong> ${fmt(rebate)} Tk.</div>
+            <div class="col-sm-6"><strong>Net Tax Liability:</strong> ${fmt(netTax)} Tk.</div>
+            <div class="col-sm-6"><strong>Monthly Tax:</strong> ${fmt(Math.round(monthly))} Tk.</div>
+        `;
+            document.getElementById('output').innerHTML = out;
+            document.getElementById('result').classList.remove('d-none');
+        }
+
+        // Download as PNG
+        function downloadAsPNG() {
+            const resultCard = document.getElementById('result');
+            html2canvas(resultCard, { scale: 2 }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Tax-Calculation-${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            });
+        }
+
+        // Download as PDF
+        function downloadAsPDF() {
+            const { jsPDF } = window.jspdf;
+            const resultCard = document.getElementById('result');
+
+            html2canvas(resultCard, { scale: 2 }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                const imgWidth = 190;
+                const pageHeight = 297;
+                const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                let heightLeft = imgHeight;
+                let position = 10;
+
+                pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                heightLeft -= pageHeight;
+
+                while (heightLeft >= 0) {
+                    position = heightLeft - imgHeight;
+                    pdf.addPage();
+                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+                    heightLeft -= pageHeight;
+                }
+
+                pdf.save(`Tax-Calculation-${new Date().toISOString().slice(0, 10)}.pdf`);
+            });
+        }
+    </script>
+</body>
+
+</html>
