@@ -76,8 +76,8 @@ We welcome:
 
 ## Footer (Add to your HTML)
 
-```html
-<footer class="text-center mt-5 py-3 text-muted small">
+
+
   <p>
     <strong>Disclaimer:</strong> This tool is for reference only. Tax laws may change. 
     We are not liable for any discrepancies. Always consult a tax professional.
@@ -87,4 +87,4 @@ We welcome:
     <a href="https://github.com/shakhawatfci/bdtax-calculator/fork" target="_blank">Fork & Improve</a> | 
     <a href="https://github.com/shakhawatfci/bdtax-calculator/issues" target="_blank">Report Issue</a>
   </p>
-</footer>
+
