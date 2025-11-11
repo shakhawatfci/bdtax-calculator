@@ -152,86 +152,122 @@
         </div>
     </footer>
 
-    <script>
-        const fmt = (n) => n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+<script>
+    const fmt = (n) => n.toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-        function calculateTax() {
-            const form = document.getElementById('taxForm');
-            if (!form.checkValidity()) {
-                form.classList.add('was-validated');
-                return;
+    function calculateTax() {
+        const form = document.getElementById('taxForm');
+        if (!form.checkValidity()) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        const year = document.getElementById('assessmentYear').value;
+        const name = document.getElementById('name').value.trim() || 'Employee';
+        const empType = document.getElementById('employeeType').value;
+        const status = document.getElementById('status').value;
+        const monSal = parseFloat(document.getElementById('monthlySalary').value) || 0;
+        const bonus = parseFloat(document.getElementById('festivalBonus').value) || 0;
+        const other = parseFloat(document.getElementById('otherIncome').value) || 0;
+        let invest = parseFloat(document.getElementById('investment').value) || 0;
+
+        const yearlySalary = monSal * 12;
+        const totalGross = yearlySalary + bonus + other;
+
+        const maxExempt = (year === '2025-26') ? 450000 : 500000;
+        const exemptSalary = Math.min(yearlySalary / 3, maxExempt);
+        const assessable = totalGross - exemptSalary;
+
+        let nonTaxLimit;
+        if (year === '2025-26') {
+            if (status === 'Male') nonTaxLimit = 350000;
+            else if (status === 'Female' || status === 'Age65') nonTaxLimit = 400000;
+            else if (status === 'Disable') nonTaxLimit = 475000;
+            else if (status === 'FreedomFighter') nonTaxLimit = 500000;
+        } else {
+            if (status === 'Male') nonTaxLimit = 375000;
+            else if (status === 'Female' || status === 'Age65') nonTaxLimit = 425000;
+            else if (status === 'Disable') nonTaxLimit = 500000;
+            else if (status === 'FreedomFighter') nonTaxLimit = 525000;
+        }
+
+        const taxable = Math.max(assessable - nonTaxLimit, 0);
+
+        // === SLAB DEFINITION ===
+        const slabs = (year === '2025-26')
+            ? [
+                { amt: 100000, rate: 0.05, label: "On first 1 Lac" },
+                { amt: 400000, rate: 0.10, label: "On next 3 Lac" },
+                { amt: 500000, rate: 0.15, label: "On next 4 Lac" },
+                { amt: 500000, rate: 0.20, label: "On next 5 Lac" },
+                { amt: Infinity, rate: 0.25, label: "On balance" }
+              ]
+            : [
+                { amt: 300000, rate: 0.10, label: "On first 3 Lac" },
+                { amt: 400000, rate: 0.15, label: "On next 3 Lac" },
+                { amt: 500000, rate: 0.20, label: "On next 4 Lac" },
+                { amt: 2000000, rate: 0.25, label: "On next 20 Lac" },
+                { amt: Infinity, rate: 0.30, label: "On balance" }
+              ];
+
+        // === CALCULATE TAX PER SLAB ===
+        let tax = 0;
+        let rem = taxable;
+        const slabDetails = [];
+
+        for (const s of slabs) {
+            if (rem <= 0) break;
+            const inSlab = Math.min(rem, s.amt === Infinity ? rem : s.amt);
+            const taxInSlab = inSlab * s.rate;
+            tax += taxInSlab;
+            rem -= inSlab;
+
+            if (inSlab > 0) {
+                slabDetails.push({
+                    label: s.label,
+                    amount: inSlab,
+                    rate: s.rate * 100,
+                    tax: taxInSlab
+                });
             }
+        }
 
-            const year = document.getElementById('assessmentYear').value;
-            const name = document.getElementById('name').value.trim() || 'Employee';
-            const empType = document.getElementById('employeeType').value;
-            const status = document.getElementById('status').value;
-            const monSal = parseFloat(document.getElementById('monthlySalary').value) || 0;
-            const bonus = parseFloat(document.getElementById('festivalBonus').value) || 0;
-            const other = parseFloat(document.getElementById('otherIncome').value) || 0;
-            let invest = parseFloat(document.getElementById('investment').value) || 0;
+        // === INVESTMENT REBATE ===
+        const reb1 = assessable * 0.03;
+        const reb3 = 1000000;
+        const maxAllowedInv = Math.min(reb1 / 0.15, reb3);
 
-            const yearlySalary = monSal * 12;
-            const totalGross = yearlySalary + bonus + other;
+        const invInput = document.getElementById('investment');
+        const invMsg = document.getElementById('invMsg');
 
-            const maxExempt = (year === '2025-26') ? 450000 : 500000;
-            const exemptSalary = Math.min(yearlySalary / 3, maxExempt);
-            const assessable = totalGross - exemptSalary;
+        if (invest > maxAllowedInv) {
+            invest = maxAllowedInv;
+            invInput.value = invest;
+            invInput.classList.add('is-invalid');
+            invMsg.textContent = `Investment capped at maximum allowable: ${fmt(maxAllowedInv)} Tk.`;
+        } else {
+            invInput.classList.remove('is-invalid');
+            invMsg.textContent = '';
+        }
 
-            let nonTaxLimit;
-            if (year === '2025-26') {
-                if (status === 'Male') nonTaxLimit = 350000;
-                else if (status === 'Female' || status === 'Age65') nonTaxLimit = 400000;
-                else if (status === 'Disable') nonTaxLimit = 475000;
-                else if (status === 'FreedomFighter') nonTaxLimit = 500000;
-            } else {
-                if (status === 'Male') nonTaxLimit = 375000;
-                else if (status === 'Female' || status === 'Age65') nonTaxLimit = 425000;
-                else if (status === 'Disable') nonTaxLimit = 500000;
-                else if (status === 'FreedomFighter') nonTaxLimit = 525000;
-            }
+        const rebate = Math.min(reb1, invest * 0.15, reb3);
+        let netTax = tax - rebate;
+        if (netTax <= 5000) netTax = 5000;
 
-            const taxable = Math.max(assessable - nonTaxLimit, 0);
+        // MATCH EXCEL: round yearly tax first, then divide by 12
+        const yearlyNetTax = Math.round(netTax);
+        const monthly = yearlyNetTax / 12;
 
-            const slabs = (year === '2025-26')
-                ? [{ amt: 100000, rate: 0.05 }, { amt: 400000, rate: 0.10 },
-                { amt: 500000, rate: 0.15 }, { amt: 500000, rate: 0.20 },
-                { amt: Infinity, rate: 0.25 }]
-                : [{ amt: 300000, rate: 0.10 }, { amt: 400000, rate: 0.15 },
-                { amt: 500000, rate: 0.20 }, { amt: 2000000, rate: 0.25 },
-                { amt: Infinity, rate: 0.30 }];
+        // === BUILD DETAILED OUTPUT ===
+        let slabHTML = '<div class="col-12"><strong>Tax Breakdown by Slab:</strong></div>';
+        slabDetails.forEach(s => {
+            slabHTML += `
+                <div class="col-sm-6"><strong>${s.label} @ ${s.rate}%</strong></div>
+                <div class="col-sm-6">${fmt(s.amount)} Tk. → ${fmt(s.tax)} Tk.</div>
+            `;
+        });
 
-            let tax = 0, rem = taxable;
-            for (const s of slabs) {
-                if (rem <= 0) break;
-                const inSlab = Math.min(rem, s.amt);
-                tax += inSlab * s.rate;
-                rem -= inSlab;
-            }
-
-            const reb1 = assessable * 0.03;
-            const reb3 = 1000000;
-            const maxAllowedInv = Math.min(reb1 / 0.15, reb3);
-
-            const invInput = document.getElementById('investment');
-            const invMsg = document.getElementById('invMsg');
-
-            if (invest > maxAllowedInv) {
-                invest = maxAllowedInv;
-                invInput.value = invest;
-                invInput.classList.add('is-invalid');
-                invMsg.textContent = `Investment capped at maximum allowable: ${fmt(maxAllowedInv)} Tk.`;
-            } else {
-                invInput.classList.remove('is-invalid');
-                invMsg.textContent = '';
-            }
-
-            const rebate = Math.min(reb1, invest * 0.15, reb3);
-            let netTax = tax - rebate;
-            if (netTax <= 5000) netTax = 5000;
-            const monthly = netTax / 12;
-
-            const out = `
+        const out = `
             <div class="col-12"><strong>Name:</strong> ${name}</div>
             <div class="col-12"><strong>Assessment Year:</strong> ${year}</div>
             <div class="col-12"><strong>Employee Type:</strong> ${empType}</div>
@@ -247,54 +283,55 @@
             <div class="col-sm-6"><strong>Non-Taxable Limit:</strong> ${fmt(nonTaxLimit)} Tk.</div>
             <div class="col-sm-6"><strong>Taxable Income:</strong> ${fmt(taxable)} Tk.</div>
             <hr class="my-2">
+            ${slabHTML}
+            <hr class="my-2">
             <div class="col-sm-6"><strong>Gross Tax Liability:</strong> ${fmt(tax)} Tk.</div>
             <div class="col-sm-6"><strong>Investment Rebate:</strong> ${fmt(rebate)} Tk.</div>
             <div class="col-sm-6"><strong>Net Tax Liability:</strong> ${fmt(netTax)} Tk.</div>
             <div class="col-sm-6"><strong>Monthly Tax:</strong> ${fmt(Math.round(monthly))} Tk.</div>
         `;
-            document.getElementById('output').innerHTML = out;
-            document.getElementById('result').classList.remove('d-none');
-        }
 
-        // Download as PNG
-        function downloadAsPNG() {
-            const resultCard = document.getElementById('result');
-            html2canvas(resultCard, { scale: 2 }).then(canvas => {
-                const link = document.createElement('a');
-                link.download = `Tax-Calculation-${new Date().toISOString().slice(0, 10)}.png`;
-                link.href = canvas.toDataURL();
-                link.click();
-            });
-        }
+        document.getElementById('output').innerHTML = out;
+        document.getElementById('result').classList.remove('d-none');
+    }
 
-        // Download as PDF
-        function downloadAsPDF() {
-            const { jsPDF } = window.jspdf;
-            const resultCard = document.getElementById('result');
+    // Download as PNG
+    function downloadAsPNG() {
+        const resultCard = document.getElementById('result');
+        html2canvas(resultCard, { scale: 2 }).then(canvas => {
+            const link = document.createElement('a');
+            link.download = `Tax-Calculation-${new Date().toISOString().slice(0, 10)}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+    }
 
-            html2canvas(resultCard, { scale: 2 }).then(canvas => {
-                const imgData = canvas.toDataURL('image/png');
-                const pdf = new jsPDF('p', 'mm', 'a4');
-                const imgWidth = 190;
-                const pageHeight = 297;
-                const imgHeight = (canvas.height * imgWidth) / canvas.width;
-                let heightLeft = imgHeight;
-                let position = 10;
+    // Download as PDF
+    function downloadAsPDF() {
+        const { jsPDF } = window.jspdf;
+        const resultCard = document.getElementById('result');
+        html2canvas(resultCard, { scale: 2 }).then(canvas => {
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const imgWidth = 190;
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            let heightLeft = imgHeight;
+            let position = 10;
 
+            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+            heightLeft -= 297;
+
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
                 pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+                heightLeft -= 297;
+            }
 
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    pdf.addPage();
-                    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-
-                pdf.save(`Tax-Calculation-${new Date().toISOString().slice(0, 10)}.pdf`);
-            });
-        }
-    </script>
+            pdf.save(`Tax-Calculation-${new Date().toISOString().slice(0, 10)}.pdf`);
+        });
+    }
+</script>
 </body>
 
 </html>
